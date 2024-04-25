@@ -1,0 +1,177 @@
+---
+title: "HW10"
+author: "Leonardo Robles-Lara"
+date: "2024-04-24"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+    theme: darkly
+---
+
+[Click here for Github link](https://github.com/leo-rl-1230/HW10)
+
+```{r, echo = FALSE, warning = FALSE, message = FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,      
+  message = FALSE,  
+  warning = FALSE   
+)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+redline <- read.csv("/Users/leo.rl/Downloads/redlining.csv")
+groceries <- read.csv("/Users/leo.rl/Downloads/groceries.csv")
+groceries$Type <- trimws(groceries$Type)
+```
+
+# **Problem 1**
+
+## **Question**
+
+Central to our inquiry is the exploration of the relationship between the prevalence of FAIR (Fair Access to Insurance Requirements) policies and the ethnic composition of a ZIP code. This analysis is nuanced with adjustments for factors such as the number of fire incidents, the age of housing units, and median family income. The overarching question driving our research delves deeper into systemic issues: Is there discernible evidence of redlining practices within the insurance industry, influenced by ethnic demographics? This exploration aims to unravel whether differential insurance policies correlate with ethnicity, potentially perpetuating economic disparities within communities.
+
+## **Approach**
+
+To address our research question, I employed a linear regression analysis. This statistical approach enables a thorough assessment of the relationship between a dependent variable—the number of FAIR policies and various independent variables, including ethnic makeup, fire incidents, the age of housing units, and median family income. By leveraging this method, we effectively control for confounding factors that could skew the analysis, ensuring a clearer understanding of the interdependencies and influence of these variables. This methodology provides the necessary framework to dissect and interpret the complex interactions that might underlie potential disparities in insurance practices across different ethnic groups.
+
+## **Results**
+
+```{r, echo = FALSE}
+model <- lm(policies ~ minority + fire + age + income, data = redline)
+coefficients <- coef(summary(model))
+confidence_interval <- confint(model)
+intv <- cbind(coefficients, confidence_interval)
+print(intv)
+```
+
+A summary of the linear regression model outlined previously provides insightful findings. Specifically, the coefficient estimate for the "minority" variable is positive (0.008359), indicating that an increase in the percentage of minority residents within a ZIP code is typically associated with a rise in the number of FAIR policies. Furthermore, the statistical significance of this relationship is underscored by the p-value associated with the "minority" variable, which stands at 0.00611. This value is below the conventional threshold of 0.05, thereby confirming the statistical significance of this finding at a 95% confidence level. These results are pivotal, as they suggest a measurable and significant interaction between the ethnic composition of a ZIP code and the allocation of FAIR policies, which may reflect underlying patterns in insurance practices.
+
+## **Conclusion**
+
+The evidence from our regression analysis indicates that ZIP codes with a higher proportion of minority residents tend to register an increased number of FAIR policies. This trend implies that such areas may experience diminished access to private insurance compared to predominantly non-minority ZIP codes. Given that a high number of FAIR policies can be seen as indicative of limited private insurance accessibility, it points towards potential discriminatory practices within the insurance industry. The analysis quantifies this with a 95% confidence interval for the "minority" variable, which ranges from 0.0025 to 0.014. This interval suggests that the true impact of the percentage of the minority population on the number of FAIR policies issued per 100 housing units is significant and falls within this defined range.
+
+While the analysis is robust in adjusting for other factors that could influence insurance accessibility, further evidence is necessary to deepen our understanding of this relationship comprehensively. Insurance companies are encouraged to utilize these insights to review and, if necessary, revise their practices to prevent any disparities in insurance access based on demographic characteristics. This approach not only fosters fairness but also aligns with broader ethical standards and regulatory expectations in the industry.
+
+# **Problem 2**
+
+## **Part A**
+
+```{r, echo = FALSE}
+price_per_store <- groceries %>%
+                    group_by(Store) %>%
+                    summarise(avg_price = mean(Price))
+
+ggplot(price_per_store, aes(x = avg_price, y = reorder(Store, avg_price))) + geom_bar(stat = "identity", fill = "lightblue") + labs(x = "Average Price of Products ($)", y = "Store", title = "Average Price of Products Sold at Each Store") + theme_minimal()  
+```
+
+This bar graph illustrates the relationship between the average price of food products and the various stores where they are available. Each bar in the graph represents the average price of products sold at a specific store, providing a clear visual comparison across different retail outlets. The bars are methodically arranged by average price, starting from the lowest to the highest. This arrangement allows for an immediate visual interpretation of which stores offer more economical options and which tend to be pricier, facilitating a straightforward comparison of price levels across different shopping locations.
+
+## **Part B**
+
+```{r, echo = FALSE}
+stores_per_product <- groceries %>%
+                      group_by(Product) %>%
+                      summarise(num_stores = n_distinct(Store))
+
+ggplot(stores_per_product, aes(x = num_stores, y = reorder(Product, num_stores))) + geom_bar(stat = "identity", fill = "khaki") + labs(x = "Number of Stores", y = "Product", title = "Number of Stores Selling Each Product") + theme_minimal() + theme(axis.text.y = element_text(size = 5.5))
+```
+
+## **Part C**
+
+```{r, echo = FALSE}
+model <- lm(Price ~ Product + Type, data = groceries)
+model_sum <- summary(model)
+type <- model_sum$coefficients[grep("^Type", rownames(model_sum$coefficients)), ]
+print(type)
+
+convenience <- groceries[groceries$Type == "Convenience", ]
+normal <- groceries[groceries$Type == "Grocery", ]
+
+bootstrap <- replicate(10000, {
+  convenience_mean <- mean(sample(convenience$Price, replace = TRUE))
+  normal_mean <- mean(sample(normal$Price, replace = TRUE))
+  convenience_mean - normal_mean
+})
+
+lower_bound <- quantile(bootstrap, 0.025, na.rm = TRUE)
+upper_bound <- quantile(bootstrap, 0.975, na.rm = TRUE)
+```
+
+The table presented above displays summary statistics for the coefficients derived from the linear regression model, which examines the relationship between Price and Product and the Type of store. The coefficients included in this table specifically pertain to the "Type" variable. This focus allows us to discern how different types of stores influence the pricing of products, independent of other variables. Each entry in the table provides essential statistical insights, such as the mean, standard deviation, and confidence intervals for each coefficient associated with store types, offering a detailed quantitative assessment of how store classification impacts product pricing within the model.
+
+
+```{r, echo = FALSE}
+text1 <- "Compared with ordinary grocery stores, convenience stores charge between $"
+text2 <- round(lower_bound, 2)
+text3 <- " and $"
+text4 <- round(upper_bound, 2)
+text5 <- " more for the same product."
+cat(text1, text2)
+cat(text3, text4, text5)
+```
+
+## **Part D**
+
+```{r, echo = FALSE}
+model <- lm(Price ~ Product + Store, data = groceries)
+model_sum <- summary(model)
+store <- model_sum$coefficients[grep("^Store", rownames(model_sum$coefficients)), ]
+print(store)
+```
+
+The table above displays summary statistics for the coefficients derived from the linear regression model analyzing the relationship between Price and both Product and Store type. The coefficients featured in this table are exclusively related to the "Store" variable. This specific focus enables a clear evaluation of how different store types influence product pricing, allowing for a nuanced understanding of pricing dynamics across various retail environments. Each statistic provided in the table, such as mean values, standard deviations, and confidence intervals, aids in interpreting the impact each store type has on the pricing models within the market.
+
+
+```{r, echo = FALSE}
+sorted_store <- sort(store[, "Estimate"])
+lowest_stores <- names(head(sorted_store, 2))
+highest_stores <- names(tail(sorted_store, 2))
+
+text_a <- "Two stores with the lowest prices for the same product:"
+text_b <- "Two stores with the highest prices for the same product:"
+cat(text_a, "\n")
+cat(lowest_stores, "\n\n")
+cat(text_b, "\n")
+cat(highest_stores, "\n")
+```
+
+## **Part E**
+
+```{r, echo = FALSE}
+central_market_coeff <- model_sum$coefficients[grep("^StoreCentral Market", rownames(model_sum$coefficients)), ]
+heb_coeff <- model_sum$coefficients[grep("^StoreH-E-B", rownames(model_sum$coefficients)), ]
+
+print("Name, Estimate, Std. Error, t value, Pr(>|t|)")
+cat("Central Market: \n", central_market_coeff, "\n")
+cat("H-E-B: \n", heb_coeff)
+```
+
+The linear regression model provides coefficients for Central Market at approximately -0.5743 and HEB at around -0.6459, with a slight difference of about 0.0725 between them. Considering the standard errors—0.17699 for Central Market and 0.15204 for HEB—these ranges do overlap, suggesting that the price difference between the two stores is not statistically significant. This implies that Central Market and HEB charge similar amounts for the same products, indicating minimal price variation between these two stores. The comparison with other stores, some of which charge significantly more, highlights that the disparities in pricing are more pronounced with other retailers than between Central Market and HEB.
+
+## **Part F**
+
+```{r, echo = FALSE}
+groceries <- mutate(groceries, Income10k = Income / 10000)
+model <- lm(Price ~ Product + Income10k, data = groceries)
+model_sum <- summary(model)
+income10k_sum <- model_sum$coefficients["Income10k", ]
+
+print("Name, Estimate, Std. Error, t value, Pr(>|t|)")
+cat("Income10k: \n", income10k_sum)
+```
+
+The table above provides summary statistics for the coefficients from the linear regression model assessing the relationship between Price, Product, and Store, with a particular focus on the 'Income10k' coefficient. The negative sign of the 'Income10k' coefficient indicates that as income increases by each increment of $10,000, the price of the same product tends to decrease. This suggests that consumers living in lower-income ZIP codes generally pay more for identical products compared to those in higher-income ZIP codes. This pattern highlights a potential economic disparity where less affluent consumers face higher prices, which could reflect a variety of socio-economic factors influencing market pricing dynamics in different geographic areas.
+
+```{r, echo = FALSE}
+text_a <- "A one-standard deviation increase in the income of a ZIP code seems to be associated"
+text_b <- "with approximately a 0.014 standard-deviation change in the price that consumers in"
+text_c <- "that ZIP code expect to pay for the same product."
+
+print(text_a)
+print(text_b)
+print(text_c)
+```
+
+This analysis reveals that for every one-standard deviation increase in the income of a ZIP code, there is a corresponding decrease in the price of the product by approximately 0.014 standard deviations. This relationship, quantified through the regression model, underscores a negative correlation between income levels and product pricing within different ZIP codes. Essentially, as the average income in an area rises, the cost of products tends to slightly decrease, illustrating a socio-economic dynamic where wealthier areas may benefit from lower prices on the same goods compared to less affluent areas.
+
